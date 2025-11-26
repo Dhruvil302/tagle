@@ -1,0 +1,16 @@
+# Core ML
+torch>=2.2
+torchvision
+
+# HuggingFace + BLIP
+transformers==4.44.2
+
+# Image processing
+pillow
+piexif
+
+# Utilities
+tqdm
+pandas
+nltk
+sqlite-utils

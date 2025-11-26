@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Model + data cache
+cache/
+hf_cache/
+huggingface/
+
+# Local data (DO NOT UPLOAD PHOTO DB)
+data/
+photos/
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
