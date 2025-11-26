@@ -38,7 +38,7 @@ Tagle automatically scans your photo library, extracts EXIF metadata, generates 
 ---
 
 ## 📦 Project Structure
-
+```markdown
 tagle/
 ├── data/                 # SQLite DB + model cache
 ├── photos/               # Your images go here
@@ -56,31 +56,31 @@ tagle/
 ├── requirements.txt
 └── README.md
 ---
-
+```
 ## ⚙️ Installation
 
 ### 1. Create virtual environment
 ```bash
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-
+```
 2. Install dependencies
-
+```bash
 pip install "torch>=2.2" torchvision --extra-index-url https://download.pytorch.org/whl/cu121
 pip install transformers==4.44.2 pillow piexif tqdm pandas nltk sqlite-utils
-
+```
 If you’re on CPU-only, just run:
-
+```bash
 pip install torch torchvision
-
+```
 and PyTorch will install the CPU version automatically.
 
 ⸻
 
 🧱 Initialize the Database
-
+```bash
 python backend/init_db.py
-
+```
 This creates:
 
 data/tagle.sqlite
@@ -105,9 +105,9 @@ Supported formats:
 ⸻
 
 🧠 Run Tagle (Full Pipeline)
-
+```bash
 python backend/ingest.py photos
-
+```
 This performs:
 	1.	Folder scan
 	2.	EXIF extraction
@@ -120,11 +120,11 @@ You can run it anytime — it only processes new/unprocessed photos.
 ⸻
 
 🔍 Search Your Photos
-
+```bash
 python backend/search_cli.py beach
 python backend/search_cli.py family sunset
 python backend/search_cli.py dog 2018
-
+```
 Example output:
 
 01. photos/beach_trip_2020.jpg
@@ -169,8 +169,8 @@ A local AI memory assistant that helps you rediscover your photos anytime, witho
 ⸻
 
 🔗 Get Started
-
+```bash
 python backend/ingest.py photos
 python backend/search_cli.py "your search terms"
-
+```
 Tagle — your memories, retrieved with intelligence — and privacy.
