@@ -1,12 +1,14 @@
+```text
 ████████╗ █████╗  ██████╗ ██╗     ███████╗
 ╚══██╔══╝██╔══██╗██╔════╝ ██║     ██╔════╝
    ██║   ███████║██║  ███╗██║     █████╗  
    ██║   ██╔══██║██║   ██║██║     ██╔══╝  
    ██║   ██║  ██║╚██████╔╝███████╗███████╗
    ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝
-                 Tagle
-      Your photos. Organized locally.
 
+                     T A G L E
+        Your photos. Organized locally.
+```
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" />
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" />
