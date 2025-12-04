@@ -1,11 +1,8 @@
-# Core ML
+# Core ML + Vision
 torch>=2.2
 torchvision
-
-# HuggingFace + BLIP
 transformers==4.44.2
-
-# Image processing
+sentence-transformers
 pillow
 piexif
 
@@ -14,3 +11,9 @@ tqdm
 pandas
 nltk
 sqlite-utils
+
+# Vector Search
+faiss-cpu
+
+# Optional: faster tokenizer for transformers
+tqdm
