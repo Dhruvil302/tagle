@@ -1,5 +1,6 @@
 # app.py - Streamlit UI for Tagle
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -8,6 +9,12 @@ import streamlit as st
 from PIL import Image
 
 from backend.semantic_search import search as semantic_search
+from backend.face_search import (
+    list_people,
+    photo_ids_for_cluster,
+    rename_person,
+    names_for_photo,
+)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -62,10 +69,15 @@ def keyword_search(
     year_range: Optional[Tuple[int, int]] = None,
     lat_range: Optional[Tuple[float, float]] = None,
     lon_range: Optional[Tuple[float, float]] = None,
+    photo_id_filter: Optional[set] = None,
 ):
     """Simple LIKE-based keyword search on caption + tags with optional filters."""
     terms = [t.strip().lower() for t in query.split() if t.strip()]
     if not terms:
+        return []
+
+    # Short-circuit: person filter with empty set → no results possible
+    if photo_id_filter is not None and len(photo_id_filter) == 0:
         return []
 
     where_clauses = []
@@ -96,13 +108,19 @@ def keyword_search(
         )
         params.extend([lat_min, lat_max, lon_min, lon_max])
 
+    # person filter (photo_ids from a face cluster)
+    if photo_id_filter is not None:
+        placeholders = ",".join("?" * len(photo_id_filter))
+        where_clauses.append(f"id IN ({placeholders})")
+        params.extend(photo_id_filter)
+
     where_sql = " AND ".join(where_clauses)
 
     con = get_db_connection()
     cur = con.cursor()
     cur.execute(
         f"""
-        SELECT file_path, caption, tags, date_taken, gps_lat, gps_lon
+        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
         FROM photos
         WHERE {where_sql}
         ORDER BY date_taken DESC, id DESC
@@ -120,8 +138,12 @@ def get_recent_photos(
     year_range: Optional[Tuple[int, int]] = None,
     lat_range: Optional[Tuple[float, float]] = None,
     lon_range: Optional[Tuple[float, float]] = None,
+    photo_id_filter: Optional[set] = None,
 ):
-    """Fetch most recent photos, optionally filtered by date/location."""
+    """Fetch most recent photos, optionally filtered by date/location/person."""
+    if photo_id_filter is not None and len(photo_id_filter) == 0:
+        return []
+
     where_clauses = []
     params: List = []
 
@@ -140,6 +162,11 @@ def get_recent_photos(
         )
         params.extend([lat_min, lat_max, lon_min, lon_max])
 
+    if photo_id_filter is not None:
+        placeholders = ",".join("?" * len(photo_id_filter))
+        where_clauses.append(f"id IN ({placeholders})")
+        params.extend(photo_id_filter)
+
     where_sql = " AND ".join(where_clauses)
     if where_sql:
         where_sql = "WHERE " + where_sql
@@ -148,7 +175,7 @@ def get_recent_photos(
     cur = con.cursor()
     cur.execute(
         f"""
-        SELECT file_path, caption, tags, date_taken, gps_lat, gps_lon
+        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
         FROM photos
         {where_sql}
         ORDER BY date_taken DESC, id DESC
@@ -173,6 +200,36 @@ def open_image(path_str: str):
         return None
 
 
+def crop_face(path_str: str, bbox_json: Optional[str], pad: float = 0.25):
+    """
+    Return a face crop (PIL image) from `path_str` using the JSON bbox [x1,y1,x2,y2].
+    Adds `pad` fraction of the face size as padding so hair/chin are visible.
+    Falls back to the full image if bbox is missing or invalid.
+    """
+    img = open_image(path_str)
+    if img is None:
+        return None
+    if not bbox_json:
+        return img
+    try:
+        x1, y1, x2, y2 = json.loads(bbox_json)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return img
+
+    w, h = img.size
+    fw = max(1.0, x2 - x1)
+    fh = max(1.0, y2 - y1)
+    px = fw * pad
+    py = fh * pad
+    left = max(0, int(x1 - px))
+    top = max(0, int(y1 - py))
+    right = min(w, int(x2 + px))
+    bottom = min(h, int(y2 + py))
+    if right <= left or bottom <= top:
+        return img
+    return img.crop((left, top, right, bottom))
+
+
 def passes_filters(
     date_taken: Optional[str],
     gps_lat: Optional[float],
@@ -180,6 +237,8 @@ def passes_filters(
     year_range: Optional[Tuple[int, int]],
     lat_range: Optional[Tuple[float, float]],
     lon_range: Optional[Tuple[float, float]],
+    photo_id: Optional[int] = None,
+    photo_id_filter: Optional[set] = None,
 ) -> bool:
     """Filter helper for semantic results (which we post-filter using DB metadata)."""
     # Date filter
@@ -200,6 +259,11 @@ def passes_filters(
         if not (lat_min <= gps_lat <= lat_max and lon_min <= gps_lon <= lon_max):
             return False
 
+    # Person filter
+    if photo_id_filter is not None:
+        if photo_id is None or photo_id not in photo_id_filter:
+            return False
+
     return True
 
 
@@ -209,10 +273,11 @@ def enrich_semantic_results(
     lat_range: Optional[Tuple[float, float]],
     lon_range: Optional[Tuple[float, float]],
     max_results: int,
+    photo_id_filter: Optional[set] = None,
 ):
     """
     Take semantic_search rows (file_path, caption, tags),
-    attach date_taken and gps from DB, and apply filters.
+    attach id/date_taken/gps from DB, and apply filters.
     """
     con = get_db_connection()
     cur = con.cursor()
@@ -221,7 +286,7 @@ def enrich_semantic_results(
     for (path, cap, tags) in semantic_rows:
         cur.execute(
             """
-            SELECT file_path, caption, tags, date_taken, gps_lat, gps_lon
+            SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
             FROM photos WHERE file_path = ?
             """,
             (path,),
@@ -229,12 +294,13 @@ def enrich_semantic_results(
         row = cur.fetchone()
         if row is None:
             continue
-        p, c, t, d, lat, lon = row
-        if passes_filters(d, lat, lon, year_range, lat_range, lon_range):
+        pid, p, c, t, d, lat, lon = row
+        if passes_filters(d, lat, lon, year_range, lat_range, lon_range,
+                          photo_id=pid, photo_id_filter=photo_id_filter):
             # prefer DB caption/tags if present
             caption = c or cap
             tag_val = t or tags
-            enriched.append((p, caption, tag_val, d, lat, lon))
+            enriched.append((pid, p, caption, tag_val, d, lat, lon))
         if len(enriched) >= max_results:
             break
 
@@ -305,6 +371,45 @@ with st.sidebar:
                 value=(float(lon_min), float(lon_max)),
             )
 
+    # Person filter
+    photo_id_filter = None
+    people_rows = list_people()
+    if people_rows:
+        enable_person = st.checkbox("Filter by person", value=False)
+        if enable_person:
+            person_labels = {
+                cid: (name if name else f"Unnamed #{cid} ({count} faces)")
+                for (cid, name, count, _sp, _bb) in people_rows
+            }
+            selected_cluster = st.selectbox(
+                "Person",
+                options=list(person_labels.keys()),
+                format_func=lambda cid: person_labels[cid],
+            )
+            photo_id_filter = photo_ids_for_cluster(selected_cluster)
+
+    # Manage people
+    if people_rows:
+        with st.expander("Manage people"):
+            st.caption("Assign a name to each face cluster. Names persist across searches.")
+            for (cid, name, count, sample_path, sample_bbox) in people_rows:
+                cols = st.columns([1, 3])
+                with cols[0]:
+                    if sample_path:
+                        face_img = crop_face(sample_path, sample_bbox)
+                        if face_img is not None:
+                            st.image(face_img, width=120)
+                with cols[1]:
+                    new_name = st.text_input(
+                        f"Cluster #{cid} ({count} faces)",
+                        value=name or "",
+                        key=f"person_name_{cid}",
+                    )
+                    if new_name != (name or ""):
+                        if st.button("Save", key=f"save_{cid}"):
+                            rename_person(cid, new_name)
+                            st.rerun()
+
     st.markdown("---")
     st.markdown("**Tip:** Make sure you ran the ingest pipeline first:")
     st.code("python backend/ingest.py photos", language="bash")
@@ -318,6 +423,7 @@ if not query.strip():
         year_range=year_range,
         lat_range=lat_range,
         lon_range=lon_range,
+        photo_id_filter=photo_id_filter,
     )
 else:
     st.subheader(f"Results for: {query!r}")
@@ -327,7 +433,8 @@ else:
         try:
             sem_results = semantic_search(query, top_k=max_results * 2)
             enriched = enrich_semantic_results(
-                sem_results, year_range, lat_range, lon_range, max_results
+                sem_results, year_range, lat_range, lon_range, max_results,
+                photo_id_filter=photo_id_filter,
             )
             results = enriched
         except Exception as e:
@@ -342,6 +449,7 @@ else:
             year_range=year_range,
             lat_range=lat_range,
             lon_range=lon_range,
+            photo_id_filter=photo_id_filter,
         )
 
     else:
@@ -360,6 +468,7 @@ else:
             year_range=year_range,
             lat_range=lat_range,
             lon_range=lon_range,
+            photo_id_filter=photo_id_filter,
         )
 
         # Build RRF scores: score(d) = sum( 1 / (k + rank_i) ) across lists
@@ -370,14 +479,14 @@ else:
             rrf_scores[p] = rrf_scores.get(p, 0.0) + 1.0 / (RRF_K + rank)
 
         # Keyword ranks (ordered by date DESC from SQL)
-        for rank, (p, _c, _t, _d, _lat, _lon) in enumerate(kw_raw, start=1):
+        for rank, (_pid, p, _c, _t, _d, _lat, _lon) in enumerate(kw_raw, start=1):
             rrf_scores[p] = rrf_scores.get(p, 0.0) + 1.0 / (RRF_K + rank)
 
         # Sort by fused score descending
         ranked_paths = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
 
         # Build a metadata lookup from keyword results (already filtered)
-        kw_map = {p: (c, t, d, lat, lon) for (p, c, t, d, lat, lon) in kw_raw}
+        kw_map = {p: (pid, c, t, d, lat, lon) for (pid, p, c, t, d, lat, lon) in kw_raw}
         sem_map = {p: (c, t) for (p, c, t) in sem_raw}
 
         # Enrich and apply filters for results that came only from semantic side
@@ -386,24 +495,25 @@ else:
         combined = []
         for p in ranked_paths:
             if p in kw_map:
-                c, t, d, lat, lon = kw_map[p]
+                pid, c, t, d, lat, lon = kw_map[p]
             else:
                 # Semantic-only result: fetch metadata and apply filters
                 cur.execute(
-                    "SELECT caption, tags, date_taken, gps_lat, gps_lon FROM photos WHERE file_path = ?",
+                    "SELECT id, caption, tags, date_taken, gps_lat, gps_lon FROM photos WHERE file_path = ?",
                     (p,),
                 )
                 row = cur.fetchone()
                 if row is None:
                     continue
-                c, t, d, lat, lon = row
-                if not passes_filters(d, lat, lon, year_range, lat_range, lon_range):
+                pid, c, t, d, lat, lon = row
+                if not passes_filters(d, lat, lon, year_range, lat_range, lon_range,
+                                      photo_id=pid, photo_id_filter=photo_id_filter):
                     continue
                 # Prefer DB values, fall back to semantic result
                 sem_c, sem_t = sem_map.get(p, (None, None))
                 c = c or sem_c
                 t = t or sem_t
-            combined.append((p, c, t, d, lat, lon))
+            combined.append((pid, p, c, t, d, lat, lon))
             if len(combined) >= max_results:
                 break
         con.close()
@@ -428,7 +538,7 @@ else:
     for i, row in enumerate(results):
         # row can be: (file_path, caption, tags, date_taken, gps_lat, gps_lon)
         # from keyword / recent / combined / enriched semantic
-        path, caption, tags, date_taken, gps_lat, gps_lon = row
+        photo_id, path, caption, tags, date_taken, gps_lat, gps_lon = row
         col = cols[i % cols_per_row]
         with col:
             img = open_image(path)
@@ -442,6 +552,9 @@ else:
                 st.caption(caption)
             if tags:
                 st.write("`" + str(tags) + "`")
+            people_in_photo = names_for_photo(photo_id)
+            if people_in_photo:
+                st.write("👤 " + ", ".join(people_in_photo))
             meta_bits = []
             if date_taken:
                 meta_bits.append(f"📅 {date_taken}")

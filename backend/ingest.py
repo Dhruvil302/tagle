@@ -24,29 +24,37 @@ if __name__ == "__main__":
 
     print("========================================")
     print("  T A G L E   -   Full Ingest Pipeline  ")
-    print("  Phases: Scan → Caption → Tag → Embed → Index")
+    print("  Phases: Scan → Caption → Tag → Embed → Index → Faces → Cluster")
     print("========================================")
     print(f"Photos directory: {photos_dir}\n")
 
     # Phase 1
-    print("[1/5] Scanning photos...")
+    print("[1/7] Scanning photos...")
     run_script("scan.py", photos_dir)
 
-    print("[2/5] Generating captions...")
+    print("[2/7] Generating captions...")
     run_script("caption.py")
 
-    print("[3/5] Extracting tags...")
+    print("[3/7] Extracting tags...")
     run_script("tagger.py")
 
     # Phase 2
-    print("[4/5] Creating CLIP embeddings...")
+    print("[4/7] Creating CLIP embeddings...")
     run_script("embedder.py")
 
-    print("[5/5] Building FAISS index...")
+    print("[5/7] Building FAISS index...")
     run_script("build_faiss.py")
+
+    # Phase 3 — Face recognition
+    print("[6/7] Detecting faces...")
+    run_script("face_detect.py")
+
+    print("[7/7] Clustering faces into persons...")
+    run_script("cluster_faces.py")
 
     print("\nTagle full pipeline complete.")
     print("   - Phase 1: scan + captions + tags")
-    print("   - Phase 2: embeddings + FAISS index\n")
+    print("   - Phase 2: embeddings + FAISS index")
+    print("   - Phase 3: face detection + clustering\n")
     print("You can now run semantic search, e.g.:")
     print('  python backend/semantic_search.py "dog on the beach"  ')

@@ -18,6 +18,12 @@ faiss-cpu
 # Geocoding
 geopy
 
+# Face recognition
+insightface
+onnxruntime
+opencv-python
+scikit-learn
+
 #Web UI
 streamlit
 

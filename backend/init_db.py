@@ -31,6 +31,31 @@ try:
     cur.execute("ALTER TABLE photos ADD COLUMN location_name TEXT")
 except sqlite3.OperationalError:
     pass  # column already exists
+
+# Face recognition tables
+cur.execute("""
+CREATE TABLE IF NOT EXISTS faces (
+  id INTEGER PRIMARY KEY,
+  photo_id INTEGER NOT NULL,
+  embedding BLOB NOT NULL,
+  bbox TEXT,
+  det_score REAL,
+  cluster_id INTEGER,
+  FOREIGN KEY(photo_id) REFERENCES photos(id)
+);
+""")
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS people (
+  cluster_id INTEGER PRIMARY KEY,
+  name TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+""")
+
+cur.execute("CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id);")
+cur.execute("CREATE INDEX IF NOT EXISTS idx_faces_cluster ON faces(cluster_id);")
+
 con.commit()
 con.close()
 print("Database initialized: data/tagle.sqlite")
