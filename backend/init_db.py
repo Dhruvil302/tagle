@@ -18,12 +18,19 @@ CREATE TABLE IF NOT EXISTS photos (
   camera_model TEXT,
   caption TEXT,
   tags TEXT,
+  location_name TEXT,
   processed_at TEXT DEFAULT (datetime('now'))
 );
 """)
 
 cur.execute("CREATE INDEX IF NOT EXISTS idx_photos_hash ON photos(file_hash);")
 cur.execute("CREATE INDEX IF NOT EXISTS idx_photos_date ON photos(date_taken);")
+
+# Migration: add location_name column if missing (for existing databases)
+try:
+    cur.execute("ALTER TABLE photos ADD COLUMN location_name TEXT")
+except sqlite3.OperationalError:
+    pass  # column already exists
 con.commit()
 con.close()
 print("Database initialized: data/tagle.sqlite")

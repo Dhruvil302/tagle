@@ -1,6 +1,16 @@
-import os, hashlib, sqlite3
+import os, hashlib, sqlite3, time
 from PIL import Image, ExifTags
 from tqdm import tqdm
+
+# --- Reverse geocoding setup ---
+try:
+    from geopy.geocoders import Nominatim
+    from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+    _geolocator = Nominatim(user_agent="tagle-photo-organizer", timeout=5)
+    GEOCODE_ENABLED = True
+except ImportError:
+    print("Geocoding not available. Run: pip install geopy")
+    GEOCODE_ENABLED = False
 
 # --- Try to add HEIC/HEIF support ---
 try:
@@ -40,12 +50,41 @@ def read_exif(path):
     return exif
 
 
+def reverse_geocode(lat, lon):
+    """Convert GPS coordinates to a human-readable location string via Nominatim."""
+    if not GEOCODE_ENABLED or lat is None or lon is None:
+        return None
+    try:
+        location = _geolocator.reverse(f"{lat}, {lon}", language="en", zoom=18)
+        if location and location.address:
+            return location.address
+    except (GeocoderTimedOut, GeocoderUnavailable) as e:
+        print(f"Geocoding failed for ({lat}, {lon}): {e}")
+    except Exception as e:
+        print(f"Geocoding error for ({lat}, {lon}): {e}")
+    return None
+
+
 def save_record(path, h, exif):
     con = sqlite3.connect(DB)
     cur = con.cursor()
+
+    gps_lat = (
+        float(exif.get('GPSInfo').get(2)[0]) + (exif.get('GPSInfo').get(2)[1] / 60) + (exif.get('GPSInfo').get(2)[2] / 3600)
+        if exif.get('GPSInfo') else None
+    )
+    gps_lon = (
+        float(exif.get('GPSInfo').get(4)[0]) + (exif.get('GPSInfo').get(4)[1] / 60) + (exif.get('GPSInfo').get(4)[2] / 3600)
+        if exif.get('GPSInfo') else None
+    )
+
+    location_name = reverse_geocode(gps_lat, gps_lon)
+    if location_name:
+        time.sleep(1)  # Nominatim rate limit: 1 request/second
+
     cur.execute("""
-    INSERT OR IGNORE INTO photos(file_path,file_hash,width,height,date_taken,camera_make,camera_model,gps_lat,gps_lon)
-    VALUES(?,?,?,?,?,?,?,?,?)
+    INSERT OR IGNORE INTO photos(file_path,file_hash,width,height,date_taken,camera_make,camera_model,gps_lat,gps_lon,location_name)
+    VALUES(?,?,?,?,?,?,?,?,?,?)
     """, (
         path,
         h,
@@ -54,8 +93,9 @@ def save_record(path, h, exif):
         str(exif.get("DateTimeOriginal") or ""),
         str(exif.get("Make") or ""),
         str(exif.get("Model") or ""),
-        float(exif.get('GPSInfo').get(2)[0])+(exif.get('GPSInfo').get(2)[1]/60)+(exif.get('GPSInfo').get(2)[2]/3600) if exif.get('GPSInfo') else None,
-        float(exif.get('GPSInfo').get(4)[0])+(exif.get('GPSInfo').get(4)[1]/60)+(exif.get('GPSInfo').get(4)[2]/3600) if exif.get('GPSInfo') else None
+        gps_lat,
+        gps_lon,
+        location_name,
     ))
     con.commit()
     con.close()

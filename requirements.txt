@@ -15,6 +15,9 @@ sqlite-utils
 # Vector Search
 faiss-cpu
 
+# Geocoding
+geopy
+
 #Web UI
 streamlit
 

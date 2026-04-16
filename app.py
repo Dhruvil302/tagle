@@ -72,11 +72,11 @@ def keyword_search(
     params: List = []
 
     # text search
-    text_clause = " AND ".join(["(LOWER(caption) LIKE ? OR LOWER(tags) LIKE ?)"] * len(terms))
+    text_clause = " AND ".join(["(LOWER(caption) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(location_name) LIKE ?)"] * len(terms))
     where_clauses.append(text_clause)
     for t in terms:
         like = f"%{t}%"
-        params.extend([like, like])
+        params.extend([like, like, like])
 
     # year filter
     if year_range is not None:
