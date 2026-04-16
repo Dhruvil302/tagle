@@ -21,6 +21,7 @@ huggingface/
 # Local data (DO NOT UPLOAD PHOTO DB)
 data/
 photos/
+converted/
 
 # Logs
 *.log
