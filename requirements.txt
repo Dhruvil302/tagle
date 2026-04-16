@@ -15,5 +15,8 @@ sqlite-utils
 # Vector Search
 faiss-cpu
 
+#Web UI
+streamlit
+
 # Optional: faster tokenizer for transformers
 tqdm

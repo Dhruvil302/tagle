@@ -14,7 +14,7 @@ model = BlipForConditionalGeneration.from_pretrained(MODEL).to(device)
 def uncaptions(limit=200):
     con = sqlite3.connect(DB)
     cur = con.cursor()
-    cur.execute("SELECT id,file_path,gps_lat,gps_lon FROM photos LIMIT ?",(limit,))
+    cur.execute("SELECT id,file_path,gps_lat,gps_lon FROM photos WHERE caption is NULL or caption='' LIMIT ?",(limit,))
     rows = cur.fetchall(); con.close()
     return rows
 
@@ -31,7 +31,7 @@ def make_caption(p,lat,lon):
     return processor.decode(out[0],skip_special_tokens=True)
 
 def run():
-    for pid,p,plat,plon in tqdm(uncaptions(100),desc="Captioning"):
+    for pid,p,plat,plon in tqdm(uncaptions(500),desc="Captioning"):
         try: save(pid,make_caption(p,plat,plon))
         except Exception as e: print("skip",p,e); time.sleep(0.1)
 

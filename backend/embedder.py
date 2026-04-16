@@ -30,7 +30,7 @@ def embed_image(path):
     img= Image.open(path).convert("RGB")
     return model.encode(img, convert_to_numpy=True)
 
-def run(batch=300):
+def run(batch=500):
     rows=get_unembedded(batch)
     for photo_id, path in tqdm(rows, desc="Embedding"):
         try:
