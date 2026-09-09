@@ -4,6 +4,7 @@ torchvision
 transformers==4.44.2
 sentence-transformers
 pillow
+pillow-heif
 piexif
 
 # Utilities
@@ -26,6 +27,3 @@ scikit-learn
 
 #Web UI
 streamlit
-
-# Optional: faster tokenizer for transformers
-tqdm

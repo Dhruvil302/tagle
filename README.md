@@ -11,7 +11,7 @@
 ```
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" />
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue" />
+  <img src="https://img.shields.io/badge/python-3.10--3.12-blue" />
   <img src="https://img.shields.io/badge/offline-AI-orange" />
   <img src="https://img.shields.io/badge/captions-BLIP-black" />
   <img src="https://img.shields.io/badge/semantic-CLIP%20%2B%20FAISS-purple" />
@@ -20,7 +20,7 @@
 </p>
 
 
-# 🏷️ Tagle
+#  Tagle
 > **Your photos, intelligently organized — all local.**
 
 Tagle is a local-first photo intelligence tool.
@@ -28,24 +28,24 @@ It scans your photos, extracts EXIF metadata, generates AI captions, reverse-geo
 
 ---
 
-## 🚀 Features
+##  Features
 
-- 🖼️ **Local photo processing** — never uploads your photos
-- 🧠 **AI-generated captions** using BLIP (runs offline)
-- 🏷️ **Automatic keyword tagging** (lightweight NLP)
-- 📅 **EXIF extraction** — date, camera, GPS
-- 🗺️ **Reverse geocoding** — resolves GPS to addresses & landmarks (e.g. `Brooklyn Bridge, New York, US`) via Nominatim
-- 👤 **Face recognition** — detects faces with InsightFace, clusters them into persons with DBSCAN, name them once in the UI
-- 🔍 **Keyword search** across captions, tags, and location names
-- ✨ **Semantic search** via CLIP + FAISS (natural-language queries)
-- 🔀 **Combined rank-fusion search** using Reciprocal Rank Fusion (RRF) to merge semantic and keyword results
-- 🎛️ **Streamlit web UI** with filters for date, GPS bounding box, and person
-- 💾 **SQLite database** — simple, portable, single file
-- 🔁 **Incremental pipeline** — only processes new files at each stage
+-  **Local photo processing** — never uploads your photos
+-  **AI-generated captions** using BLIP (runs offline)
+-  **Automatic keyword tagging** (lightweight NLP)
+-  **EXIF extraction** — date, camera, GPS
+-  **Reverse geocoding** — resolves GPS to addresses & landmarks (e.g. `Brooklyn Bridge, New York, US`) via Nominatim
+-  **Face recognition** — detects faces with InsightFace, clusters them into persons with DBSCAN, name them once in the UI
+-  **Keyword search** across captions, tags, and location names
+-  **Semantic search** via CLIP + FAISS (natural-language queries)
+-  **Combined rank-fusion search** using Reciprocal Rank Fusion (RRF) to merge semantic and keyword results
+-  **Streamlit web UI** with filters for date, GPS bounding box, and person
+-  **SQLite database** — simple, portable, single file
+-  **Incremental pipeline** — only processes new files at each stage
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 ```markdown
 tagle/
 ├── data/                       # SQLite DB + FAISS index (ignored in git)
@@ -76,13 +76,29 @@ tagle/
 
 ---
 
-## ⚙️ Installation
+## Installation
 
 ### 1. Create a virtual environment
+
+> **Python 3.10–3.12 required.** Key dependencies (`torch`, `faiss-cpu`, `insightface`, `onnxruntime`) do not yet publish wheels for Python 3.13+. Using a newer version will cause wheel-build failures.
+
+**macOS / Linux:**
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python3.11 -m venv .venv
+source .venv/bin/activate
 ```
+
+**Windows:**
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\activate
+```
+
+If Python 3.11 is not found, install it via your package manager:
+- **macOS:** `brew install python@3.11`
+- **Ubuntu/Debian:** `sudo apt install python3.11 python3.11-venv`
+- **Windows:** Download from [python.org/downloads](https://www.python.org/downloads/release/python-3119/) and check "Add to PATH" during install
+- **pyenv:** `pyenv install 3.11` (the included `.python-version` file will auto-select it)
 
 ### 2. Install dependencies
 ```bash
@@ -104,7 +120,7 @@ Creates `data/tagle.sqlite` with the `photos`, `embeddings`, `faces`, and `peopl
 
 ---
 
-## 📸 Add Your Photos
+## Add Your Photos
 
 Place any number of images into:
 ```
@@ -114,7 +130,7 @@ Supported formats: **JPG / JPEG, PNG, WEBP, TIFF, BMP, HEIC/HEIF** (HEIC is auto
 
 ---
 
-## 🧠 Run the Full Pipeline
+## Run the Full Pipeline
 
 ```bash
 python backend/ingest.py photos
@@ -136,7 +152,7 @@ This runs all 7 stages sequentially — each is incremental, so re-running only 
 
 ---
 
-## 🗺️ Backfill Location Names (for existing DBs)
+## Backfill Location Names (for existing DBs)
 
 If you already have photos in the DB that predate reverse geocoding:
 ```bash
@@ -146,7 +162,7 @@ Geocodes every photo with GPS that doesn't yet have a `location_name`. One-time 
 
 ---
 
-## 🔍 CLI Search
+## CLI Search
 
 ### Keyword search (matches captions, tags, and location)
 ```bash
@@ -163,14 +179,14 @@ python backend/semantic_search.py "sunset mountains" 20
 
 Example output:
 ```text
-📸 photos/IMG_1123.jpg
+   photos/IMG_1123.jpg
     caption: A dog running along the beach at sunset.
     tags: dog,running,beach,sunset
 ```
 
 ---
 
-## 🖥️ Streamlit Web UI
+## Streamlit Web UI
 
 Launch the app:
 ```bash
@@ -189,7 +205,7 @@ The UI provides:
 
 ---
 
-## 👤 Person Search
+## Person Search
 
 1. Run `python backend/face_detect.py` (or the full ingest) to detect faces in all photos.
 2. Run `python backend/cluster_faces.py` to group similar faces into clusters.
@@ -205,7 +221,7 @@ python backend/cluster_faces.py --eps 0.4 --min-samples 3
 
 ---
 
-## 🔀 Combined Rank Fusion
+## Combined Rank Fusion
 
 The Combined search mode doesn't just intersect results — it uses **Reciprocal Rank Fusion**:
 
@@ -217,7 +233,7 @@ across the semantic and keyword rankings. Photos that appear high in either list
 
 ---
 
-## 🧭 Design Philosophy
+## Design Philosophy
 
 | Principle | |
 |-----------|--|
@@ -230,13 +246,13 @@ across the semantic and keyword rankings. Photos that appear high in either list
 
 ---
 
-## 🧾 License
+## License
 
 MIT License © 2025 — Dhruvil Vasoya
 
 ---
 
-## 💬 Credits
+## Credits
 
 - Salesforce **BLIP** — image captioning
 - **OpenCLIP / SentenceTransformers** — image/text embeddings
@@ -249,17 +265,18 @@ MIT License © 2025 — Dhruvil Vasoya
 
 ---
 
-## ✨ Why "Tagle"?
+## Why "Tagle"?
 
 Tagle = "Tag" + "Google" (in spirit) —
 A local AI memory assistant that helps you rediscover your photos anytime, without ever leaving your device.
 
 ---
 
-## 🔗 Get Started
+## Get Started
 
 ```bash
-# First time only
+# First time only (requires Python 3.10–3.12)
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python backend/init_db.py
 
