@@ -65,18 +65,33 @@ def reverse_geocode(lat, lon):
     return None
 
 
+def _parse_gps_coords(gps_info):
+    """Convert EXIF GPSInfo dict to decimal (lat, lon), applying N/S/E/W references."""
+    if not gps_info:
+        return None, None
+    try:
+        def dms_to_decimal(dms):
+            d, m, s = [float(x) for x in dms]
+            return d + m / 60 + s / 3600
+
+        lat = dms_to_decimal(gps_info.get(2, [0, 0, 0]))
+        lon = dms_to_decimal(gps_info.get(4, [0, 0, 0]))
+
+        if gps_info.get(1) == 'S':
+            lat = -lat
+        if gps_info.get(3) == 'W':
+            lon = -lon
+
+        return lat, lon
+    except Exception:
+        return None, None
+
+
 def save_record(path, h, exif):
     con = sqlite3.connect(DB)
     cur = con.cursor()
 
-    gps_lat = (
-        float(exif.get('GPSInfo').get(2)[0]) + (exif.get('GPSInfo').get(2)[1] / 60) + (exif.get('GPSInfo').get(2)[2] / 3600)
-        if exif.get('GPSInfo') else None
-    )
-    gps_lon = (
-        float(exif.get('GPSInfo').get(4)[0]) + (exif.get('GPSInfo').get(4)[1] / 60) + (exif.get('GPSInfo').get(4)[2] / 3600)
-        if exif.get('GPSInfo') else None
-    )
+    gps_lat, gps_lon = _parse_gps_coords(exif.get('GPSInfo'))
 
     location_name = reverse_geocode(gps_lat, gps_lon)
     if location_name:

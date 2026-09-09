@@ -27,7 +27,7 @@ def get_db_connection():
     return sqlite3.connect(DB_PATH)
 
 
-@st.cache_data
+@st.cache_data(ttl=600)
 def get_metadata_bounds():
     """
     Compute bounds for date (years) and GPS (lat/lon) based on what's in the DB.
@@ -120,7 +120,7 @@ def keyword_search(
     cur = con.cursor()
     cur.execute(
         f"""
-        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
+        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon, location_name
         FROM photos
         WHERE {where_sql}
         ORDER BY date_taken DESC, id DESC
@@ -175,7 +175,7 @@ def get_recent_photos(
     cur = con.cursor()
     cur.execute(
         f"""
-        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
+        SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon, location_name
         FROM photos
         {where_sql}
         ORDER BY date_taken DESC, id DESC
@@ -286,7 +286,7 @@ def enrich_semantic_results(
     for (path, cap, tags) in semantic_rows:
         cur.execute(
             """
-            SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon
+            SELECT id, file_path, caption, tags, date_taken, gps_lat, gps_lon, location_name
             FROM photos WHERE file_path = ?
             """,
             (path,),
@@ -294,13 +294,12 @@ def enrich_semantic_results(
         row = cur.fetchone()
         if row is None:
             continue
-        pid, p, c, t, d, lat, lon = row
+        pid, p, c, t, d, lat, lon, loc = row
         if passes_filters(d, lat, lon, year_range, lat_range, lon_range,
                           photo_id=pid, photo_id_filter=photo_id_filter):
-            # prefer DB caption/tags if present
             caption = c or cap
             tag_val = t or tags
-            enriched.append((pid, p, caption, tag_val, d, lat, lon))
+            enriched.append((pid, p, caption, tag_val, d, lat, lon, loc))
         if len(enriched) >= max_results:
             break
 
@@ -479,14 +478,14 @@ else:
             rrf_scores[p] = rrf_scores.get(p, 0.0) + 1.0 / (RRF_K + rank)
 
         # Keyword ranks (ordered by date DESC from SQL)
-        for rank, (_pid, p, _c, _t, _d, _lat, _lon) in enumerate(kw_raw, start=1):
+        for rank, (_pid, p, _c, _t, _d, _lat, _lon, _loc) in enumerate(kw_raw, start=1):
             rrf_scores[p] = rrf_scores.get(p, 0.0) + 1.0 / (RRF_K + rank)
 
         # Sort by fused score descending
         ranked_paths = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
 
         # Build a metadata lookup from keyword results (already filtered)
-        kw_map = {p: (pid, c, t, d, lat, lon) for (pid, p, c, t, d, lat, lon) in kw_raw}
+        kw_map = {p: (pid, c, t, d, lat, lon, loc) for (pid, p, c, t, d, lat, lon, loc) in kw_raw}
         sem_map = {p: (c, t) for (p, c, t) in sem_raw}
 
         # Enrich and apply filters for results that came only from semantic side
@@ -495,25 +494,24 @@ else:
         combined = []
         for p in ranked_paths:
             if p in kw_map:
-                pid, c, t, d, lat, lon = kw_map[p]
+                pid, c, t, d, lat, lon, loc = kw_map[p]
             else:
                 # Semantic-only result: fetch metadata and apply filters
                 cur.execute(
-                    "SELECT id, caption, tags, date_taken, gps_lat, gps_lon FROM photos WHERE file_path = ?",
+                    "SELECT id, caption, tags, date_taken, gps_lat, gps_lon, location_name FROM photos WHERE file_path = ?",
                     (p,),
                 )
                 row = cur.fetchone()
                 if row is None:
                     continue
-                pid, c, t, d, lat, lon = row
+                pid, c, t, d, lat, lon, loc = row
                 if not passes_filters(d, lat, lon, year_range, lat_range, lon_range,
                                       photo_id=pid, photo_id_filter=photo_id_filter):
                     continue
-                # Prefer DB values, fall back to semantic result
                 sem_c, sem_t = sem_map.get(p, (None, None))
                 c = c or sem_c
                 t = t or sem_t
-            combined.append((pid, p, c, t, d, lat, lon))
+            combined.append((pid, p, c, t, d, lat, lon, loc))
             if len(combined) >= max_results:
                 break
         con.close()
@@ -538,7 +536,7 @@ else:
     for i, row in enumerate(results):
         # row can be: (file_path, caption, tags, date_taken, gps_lat, gps_lon)
         # from keyword / recent / combined / enriched semantic
-        photo_id, path, caption, tags, date_taken, gps_lat, gps_lon = row
+        photo_id, path, caption, tags, date_taken, gps_lat, gps_lon, location_name = row
         col = cols[i % cols_per_row]
         with col:
             img = open_image(path)
@@ -558,7 +556,9 @@ else:
             meta_bits = []
             if date_taken:
                 meta_bits.append(f"📅 {date_taken}")
-            if gps_lat is not None and gps_lon is not None:
+            if location_name:
+                meta_bits.append(f"📍 {location_name}")
+            elif gps_lat is not None and gps_lon is not None:
                 meta_bits.append(f"📍 ({gps_lat:.3f}, {gps_lon:.3f})")
             if meta_bits:
                 st.write(" • ".join(meta_bits))
