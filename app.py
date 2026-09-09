@@ -314,7 +314,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📸 Tagle")
+st.title("Tagle")
 st.caption("Your photos. Organized locally.")
 
 min_year, max_year, lat_min, lat_max, lon_min, lon_max = get_metadata_bounds()
@@ -543,7 +543,7 @@ else:
             if img is not None:
                 st.image(img, width='stretch')
             else:
-                st.write("🚫 Image not found")
+                st.write(" Image not found")
 
             st.markdown(f"**`{Path(path).name}`**", help=str(path))
             if caption:
@@ -552,13 +552,13 @@ else:
                 st.write("`" + str(tags) + "`")
             people_in_photo = names_for_photo(photo_id)
             if people_in_photo:
-                st.write("👤 " + ", ".join(people_in_photo))
+                st.write("Person identified " + ", ".join(people_in_photo))
             meta_bits = []
             if date_taken:
-                meta_bits.append(f"📅 {date_taken}")
+                meta_bits.append(f"Date {date_taken}")
             if location_name:
-                meta_bits.append(f"📍 {location_name}")
+                meta_bits.append(f"Location: {location_name}")
             elif gps_lat is not None and gps_lon is not None:
-                meta_bits.append(f"📍 ({gps_lat:.3f}, {gps_lon:.3f})")
+                meta_bits.append(f"Co-ordinates ({gps_lat:.3f}, {gps_lon:.3f})")
             if meta_bits:
                 st.write(" • ".join(meta_bits))

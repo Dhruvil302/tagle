@@ -54,7 +54,7 @@ if __name__ == "__main__":
         results = search(query, top_k=top_k)
 
         for p, c, t in results:
-            print("📸", p)
+            print("Photo ID:", p)
             print("   caption:", c)
             print("   tags:", t)
             print()
